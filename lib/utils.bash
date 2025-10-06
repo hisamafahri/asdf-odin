@@ -33,13 +33,22 @@ list_all_versions() {
 	list_github_tags
 }
 
+build_url() {
+}
+
 download_release() {
 	local version filename url
 	version="$1"
 	filename="$2"
 
 	# TODO: Adapt the release URL convention for odin
-	url="$GH_REPO/archive/${version}.tar.gz"
+  local platform arch version zformat
+  platform="$1"
+  arch="$2"
+  version="$3"
+  zformat="$4"
+
+  url="$GH_REPO/releases/download/${version}/odin-${platform}-${arch}-${version}.${zformat}"
 
 	echo "* Downloading $TOOL_NAME release $version..."
 	curl "${curl_opts[@]}" -o "$filename" -C - "$url" || fail "Could not download $url"
