@@ -11,4 +11,4 @@ source "${plugin_dir}/lib/utils.bash"
 mkdir -p "$ASDF_DOWNLOAD_PATH"
 
 # Download and build from source
-download_release "$ASDF_INSTALL_VERSION" ""
+download_release "$ASDF_INSTALL_VERSION"
