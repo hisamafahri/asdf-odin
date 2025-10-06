@@ -38,6 +38,16 @@ download_release() {
 	version="$1"
 	filename="$2"
 
+	# Handle "latest" version by resolving it to the actual latest tag
+	if [ "$version" = "latest" ]; then
+		echo "* Resolving latest version..."
+		# Use the same logic as latest-stable script
+		local redirect_url
+		redirect_url=$(curl -sI "$GH_REPO/releases/latest" | sed -n -e "s|^location: *||p" | sed -n -e "s|\r||p")
+		version=$(printf "%s\n" "$redirect_url" | sed 's|.*/tag/||')
+		echo "* Latest version resolved to: $version"
+	fi
+
 	echo "* Downloading $TOOL_NAME source $version..."
 	
 	# Clone the repository and checkout the specific version
