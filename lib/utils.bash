@@ -24,9 +24,13 @@ sort_versions() {
 }
 
 list_github_tags() {
+	# IMPORTANT:
+	# Only list tags that have the 'dev-' prefix
+	# This filters out stable releases and only shows development versions
 	git ls-remote --tags --refs "$GH_REPO" |
 		grep -o 'refs/tags/.*' | cut -d/ -f3- |
-		sed 's/^v//' # NOTE: You might want to adapt this sed to remove non-version strings from tags
+		sed 's/^v//' |  # Remove 'v' prefix if present
+		grep '^dev-'    # Only include tags starting with 'dev-'
 }
 
 list_all_versions() {
