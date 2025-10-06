@@ -33,25 +33,109 @@ list_all_versions() {
 	list_github_tags
 }
 
-build_url() {
-}
-
 download_release() {
-	local version filename url
+	local version filename
 	version="$1"
 	filename="$2"
 
-	# TODO: Adapt the release URL convention for odin
-  local platform arch version zformat
-  platform="$1"
-  arch="$2"
-  version="$3"
-  zformat="$4"
-
-  url="$GH_REPO/releases/download/${version}/odin-${platform}-${arch}-${version}.${zformat}"
-
-	echo "* Downloading $TOOL_NAME release $version..."
-	curl "${curl_opts[@]}" -o "$filename" -C - "$url" || fail "Could not download $url"
+	echo "* Downloading $TOOL_NAME source $version..."
+	
+	# Clone the repository and checkout the specific version
+	git clone --depth 1 --branch "$version" "$GH_REPO" "$ASDF_DOWNLOAD_PATH/odin-source" || fail "Could not clone $GH_REPO at version $version"
+	
+	# Build Odin from source
+	echo "* Building $TOOL_NAME from source..."
+	cd "$ASDF_DOWNLOAD_PATH/odin-source"
+	
+	# Check for required dependencies and build based on platform
+	case "$(uname -s)" in
+		Darwin*)
+			# Check for XCode command line tools
+			if ! command -v clang &> /dev/null; then
+				fail "XCode command line tools are required. Please run: xcode-select --install"
+			fi
+			
+			# Check for LLVM via Homebrew first, then system
+			LLVM_CONFIG=""
+			if command -v brew &> /dev/null; then
+				# Try to find compatible LLVM versions via Homebrew (in order of preference)
+				for version in 20 19 18 17 14 13 12 11; do
+					HOMEBREW_LLVM_PREFIX="$(brew --prefix llvm@$version 2>/dev/null || echo "")"
+					if [ -n "$HOMEBREW_LLVM_PREFIX" ] && [ -f "$HOMEBREW_LLVM_PREFIX/bin/llvm-config" ]; then
+						LLVM_CONFIG="$HOMEBREW_LLVM_PREFIX/bin/llvm-config"
+						echo "* Using Homebrew LLVM@$version: $LLVM_CONFIG"
+						break
+					fi
+				done
+				
+				# Also try unversioned LLVM (but check if it's a compatible version)
+				if [ -z "$LLVM_CONFIG" ]; then
+					HOMEBREW_LLVM_PREFIX="$(brew --prefix llvm 2>/dev/null || echo "")"
+					if [ -n "$HOMEBREW_LLVM_PREFIX" ] && [ -f "$HOMEBREW_LLVM_PREFIX/bin/llvm-config" ]; then
+						# Check if the version is compatible
+						LLVM_VERSION="$($HOMEBREW_LLVM_PREFIX/bin/llvm-config --version | cut -d. -f1)"
+						case "$LLVM_VERSION" in
+							11|12|13|14|17|18|19|20)
+								LLVM_CONFIG="$HOMEBREW_LLVM_PREFIX/bin/llvm-config"
+								echo "* Using Homebrew LLVM $LLVM_VERSION: $LLVM_CONFIG"
+								;;
+							*)
+								echo "* Found LLVM $LLVM_VERSION but Odin requires version 11, 12, 13, 14, 17, 18, 19, or 20"
+								;;
+						esac
+					fi
+				fi
+			fi
+			
+			# Fallback to system llvm-config
+			if [ -z "$LLVM_CONFIG" ] && command -v llvm-config &> /dev/null; then
+				LLVM_CONFIG="$(command -v llvm-config)"
+				echo "* Using system LLVM: $LLVM_CONFIG"
+			fi
+			
+			# If no LLVM found, provide installation instructions
+			if [ -z "$LLVM_CONFIG" ]; then
+				echo "* LLVM not found. Installing compatible version via Homebrew..."
+				if command -v brew &> /dev/null; then
+					# Install a specific compatible LLVM version (20 is the latest supported)
+					brew install llvm@20 || fail "Failed to install LLVM@20 via Homebrew"
+					HOMEBREW_LLVM_PREFIX="$(brew --prefix llvm@20)"
+					LLVM_CONFIG="$HOMEBREW_LLVM_PREFIX/bin/llvm-config"
+					echo "* Installed LLVM@20 via Homebrew: $LLVM_CONFIG"
+				else
+					fail "LLVM is required but Homebrew is not installed. Please install Homebrew and then run: brew install llvm@20"
+				fi
+			fi
+			
+			# Build with the found LLVM
+			LLVM_CONFIG="$LLVM_CONFIG" make release-native || fail "Could not build Odin for macOS"
+			;;
+		Linux*)
+			# Check for clang and LLVM
+			if ! command -v clang &> /dev/null; then
+				fail "Clang is required. Please install clang (e.g., apt install clang or dnf install clang)"
+			fi
+			
+			if ! command -v llvm-config &> /dev/null; then
+				fail "LLVM development tools are required. Please install llvm-dev or llvm-devel"
+			fi
+			
+			echo "* Using system LLVM: $(command -v llvm-config)"
+			make release-native || fail "Could not build Odin for Linux"
+			;;
+		*)
+			fail "Unsupported platform: $(uname -s). Please build manually and submit a PR for this platform."
+			;;
+	esac
+	
+	# Move the built binary and required folders to the expected location
+	mkdir -p "$ASDF_DOWNLOAD_PATH"
+	cp odin "$ASDF_DOWNLOAD_PATH/"
+	cp -r base core vendor "$ASDF_DOWNLOAD_PATH/"
+	
+	# Clean up source directory
+	cd "$ASDF_DOWNLOAD_PATH"
+	rm -rf odin-source
 }
 
 install_version() {
@@ -65,9 +149,31 @@ install_version() {
 
 	(
 		mkdir -p "$install_path"
-		cp -r "$ASDF_DOWNLOAD_PATH"/* "$install_path"
+		
+		# Copy the odin binary
+		cp "$ASDF_DOWNLOAD_PATH/odin" "$install_path/odin.bin"
+		
+		# Copy the required folders (base, core, vendor) to the parent directory
+		# These need to be next to the binary for Odin to work properly
+		local odin_root="${install_path%/bin}"
+		cp -r "$ASDF_DOWNLOAD_PATH/base" "$odin_root/"
+		cp -r "$ASDF_DOWNLOAD_PATH/core" "$odin_root/"
+		cp -r "$ASDF_DOWNLOAD_PATH/vendor" "$odin_root/"
+		
+		# Create a wrapper script that sets ODIN_ROOT
+		cat > "$install_path/odin" << 'EOF'
+#!/usr/bin/env bash
+# Odin wrapper script that sets ODIN_ROOT correctly
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ODIN_ROOT="$(dirname "$SCRIPT_DIR")"
+export ODIN_ROOT
+exec "$ODIN_ROOT/bin/odin.bin" "$@"
+EOF
+		
+		# Make the wrapper executable
+		chmod +x "$install_path/odin"
 
-		# TODO: Assert odin executable exists.
+		# Test that odin executable exists and is executable.
 		local tool_cmd
 		tool_cmd="$(echo "$TOOL_TEST" | cut -d' ' -f1)"
 		test -x "$install_path/$tool_cmd" || fail "Expected $install_path/$tool_cmd to be executable."
