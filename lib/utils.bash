@@ -2,8 +2,7 @@
 
 set -euo pipefail
 
-# TODO: Ensure this is the correct GitHub homepage where releases can be downloaded for odin.
-GH_REPO="https://github.com/hisamafahri/asdf-odin"
+GH_REPO="https://github.com/odin-lang/Odin"
 TOOL_NAME="odin"
 TOOL_TEST="odin version"
 
@@ -31,8 +30,6 @@ list_github_tags() {
 }
 
 list_all_versions() {
-	# TODO: Adapt this. By default we simply list the tag names from GitHub releases.
-	# Change this function if odin has other means of determining installable versions.
 	list_github_tags
 }
 
@@ -42,7 +39,7 @@ download_release() {
 	filename="$2"
 
 	# TODO: Adapt the release URL convention for odin
-	url="$GH_REPO/archive/v${version}.tar.gz"
+	url="$GH_REPO/archive/${version}.tar.gz"
 
 	echo "* Downloading $TOOL_NAME release $version..."
 	curl "${curl_opts[@]}" -o "$filename" -C - "$url" || fail "Could not download $url"
