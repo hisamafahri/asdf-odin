@@ -29,8 +29,8 @@ list_github_tags() {
 	# This filters out stable releases and only shows development versions
 	git ls-remote --tags --refs "$GH_REPO" |
 		grep -o 'refs/tags/.*' | cut -d/ -f3- |
-		sed 's/^v//' |  # Remove 'v' prefix if present
-		grep '^dev-'    # Only include tags starting with 'dev-'
+		sed 's/^v//' | # Remove 'v' prefix if present
+		grep '^dev-'   # Only include tags starting with 'dev-'
 }
 
 list_all_versions() {
@@ -86,7 +86,7 @@ download_release() {
 				HOMEBREW_LLVM_PREFIX="$(brew --prefix llvm 2>/dev/null || echo "")"
 				if [ -n "$HOMEBREW_LLVM_PREFIX" ] && [ -f "$HOMEBREW_LLVM_PREFIX/bin/llvm-config" ]; then
 					# Check if the version is compatible
-					LLVM_VERSION="$($HOMEBREW_LLVM_PREFIX/bin/llvm-config --version | cut -d. -f1)"
+					LLVM_VERSION="$("$HOMEBREW_LLVM_PREFIX"/bin/llvm-config --version | cut -d. -f1)"
 					case "$LLVM_VERSION" in
 					11 | 12 | 13 | 14 | 17 | 18 | 19 | 20)
 						LLVM_CONFIG="$HOMEBREW_LLVM_PREFIX/bin/llvm-config"
@@ -128,7 +128,7 @@ download_release() {
 		if ! command -v clang &>/dev/null; then
 			echo "* Clang not found. Installing via package manager..."
 			if command -v apt-get &>/dev/null; then
-				sudo apt-get update && sudo apt-get install -y clang || fail "Failed to install clang via apt-get"
+				sudo apt-get update && (sudo apt-get install -y clang || fail "Failed to install clang via apt-get")
 			elif command -v dnf &>/dev/null; then
 				sudo dnf install -y clang || fail "Failed to install clang via dnf"
 			elif command -v yum &>/dev/null; then
