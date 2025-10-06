@@ -34,9 +34,8 @@ list_all_versions() {
 }
 
 download_release() {
-	local version filename
+	local version
 	version="$1"
-	filename="$2"
 
 	# Handle "latest" version by resolving it to the actual latest tag
 	if [ "$version" = "latest" ]; then
