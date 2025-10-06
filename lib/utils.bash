@@ -123,11 +123,29 @@ download_release() {
 		Linux*)
 			# Check for clang and LLVM
 			if ! command -v clang &> /dev/null; then
-				fail "Clang is required. Please install clang (e.g., apt install clang or dnf install clang)"
+				echo "* Clang not found. Installing via package manager..."
+				if command -v apt-get &> /dev/null; then
+					sudo apt-get update && sudo apt-get install -y clang || fail "Failed to install clang via apt-get"
+				elif command -v dnf &> /dev/null; then
+					sudo dnf install -y clang || fail "Failed to install clang via dnf"
+				elif command -v yum &> /dev/null; then
+					sudo yum install -y clang || fail "Failed to install clang via yum"
+				else
+					fail "Clang is required. Please install clang (e.g., apt install clang or dnf install clang)"
+				fi
 			fi
 			
 			if ! command -v llvm-config &> /dev/null; then
-				fail "LLVM development tools are required. Please install llvm-dev or llvm-devel"
+				echo "* LLVM development tools not found. Installing via package manager..."
+				if command -v apt-get &> /dev/null; then
+					sudo apt-get install -y llvm-dev || fail "Failed to install llvm-dev via apt-get"
+				elif command -v dnf &> /dev/null; then
+					sudo dnf install -y llvm-devel || fail "Failed to install llvm-devel via dnf"
+				elif command -v yum &> /dev/null; then
+					sudo yum install -y llvm-devel || fail "Failed to install llvm-devel via yum"
+				else
+					fail "LLVM development tools are required. Please install llvm-dev or llvm-devel"
+				fi
 			fi
 			
 			echo "* Using system LLVM: $(command -v llvm-config)"
